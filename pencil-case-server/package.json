@@ -1,0 +1,32 @@
+{
+  "name": "pencil-case-server",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node src/server.js",
+    "deploy:rinkeby": "truffle deploy --reset --network rinkeby",
+    "deploy:extdev": "truffle deploy --reset --network extdev_plasma_us1",
+    "mapContracts": "node commands/mapContracts",
+    "transferCoins": "node commands/transferCoins"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "ethers": "^4.0.44",
+    "express": "^4.17.1",
+    "http": "^0.0.0",
+    "jsonwebtoken": "^8.5.1",
+    "loom-js": "1.70.0",
+    "loom-truffle-provider": "^0.13.0",
+    "mongoose": "^5.9.1",
+    "openzeppelin-solidity": "^2.5.0",
+    "passport": "^0.4.1",
+    "passport-jwt": "^4.0.0",
+    "truffle-hdwallet-provider": "^1.0.17",
+    "validator": "^12.2.0",
+    "web3": "^1.2.6"
+  },
+  "main": "e",
+  "license": "MIT"
+}
