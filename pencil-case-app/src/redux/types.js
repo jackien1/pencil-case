@@ -1,0 +1,11 @@
+export const CHANGE_USER_NAME = "change_user_name";
+export const CHANGE_SCHOOL = "change_school";
+export const CHANGE_LOCATION = "change_location";
+export const CHANGE_EMAIL = "change_email";
+export const CHANGE_PASSWORD = "change_password";
+export const CHANGE_PASSWORD_CONFIRM = "change_password_confirm";
+export const CHANGE_LEMAIL = "change_lemail";
+export const CHANGE_LPASSWORD = "change_lpassword";
+export const SET_CURRENT_USER = "set_current_user";
+export const CHANGE_OPPORTUNITIES = "change_opportunities";
+export const CHANGE_MY_OPPORTUNITIES = "change_my_opportunities";

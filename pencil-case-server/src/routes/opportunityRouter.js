@@ -63,7 +63,8 @@ router.post(
           `http://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${link
             .split(" ")
             .join("")}`,
-          req.body.quantity
+          req.body.quantity,
+          req.body.date
         )
         .send({
           from: user.address
@@ -79,52 +80,81 @@ router.post(
   }
 );
 
-router.get("/getOpportunities", async (req, res) => {
-  const privateKey = CryptoUtils.generatePrivateKey();
-  const publicKey = CryptoUtils.publicKeyFromPrivateKey(privateKey);
-  let address = LocalAddress.fromPublicKey(publicKey).toString();
+router.get(
+  "/getOpportunities",
+  passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    const user = await User.findOne({ email: req.user.email });
+    const privateKey = new Uint8Array(JSON.parse("[" + user.privateKey + "]"));
+    const publicKey = CryptoUtils.publicKeyFromPrivateKey(privateKey);
 
-  let client = new Client(
-    "extdev-plasma-us1",
-    "wss://extdev-plasma-us1.dappchains.com/websocket",
-    "wss://extdev-plasma-us1.dappchains.com/queryws"
-  );
+    let client = new Client(
+      "extdev-plasma-us1",
+      "wss://extdev-plasma-us1.dappchains.com/websocket",
+      "wss://extdev-plasma-us1.dappchains.com/queryws"
+    );
 
-  client.txMiddleware = [
-    new NonceTxMiddleware(publicKey, client),
-    new SignedTxMiddleware(privateKey)
-  ];
+    client.txMiddleware = [
+      new NonceTxMiddleware(publicKey, client),
+      new SignedTxMiddleware(privateKey)
+    ];
 
-  let web3 = new Web3(new LoomProvider(client, privateKey));
+    let web3 = new Web3(new LoomProvider(client, privateKey));
 
-  let hubInstance = new web3.eth.Contract(
-    Hub.abi,
-    Hub.networks["9545242630824"].address,
-    { from: address }
-  );
+    let hubInstance = new web3.eth.Contract(
+      Hub.abi,
+      Hub.networks["9545242630824"].address,
+      { from: user.address }
+    );
 
-  try {
-    let opportunities = await hubInstance.methods.returnOpportunities().call();
+    try {
+      let opportunities = await hubInstance.methods
+        .returnOpportunities()
+        .call();
 
-    const result = await opportunities.map(async opportunity => {
-      const contract = new web3.eth.Contract(Opportunity.abi, opportunity);
-      const details = await contract.methods.getDetails().call({
-        from: address
+      const result = await opportunities.map(async opportunity => {
+        const contract = new web3.eth.Contract(Opportunity.abi, opportunity);
+        const details = await contract.methods.getDetails().call({
+          from: user.address
+        });
+
+        const owner = await User.findOne({ address: details[5].toLowerCase() });
+        return { ...details, address: opportunity, email: owner.email };
       });
 
-      const user = await User.findOne({ address: details[5].toLowerCase() });
-      return { ...details, address: opportunity, email: user.email };
-    });
+      const finishedResult = await Promise.all(result);
 
-    const finishedResult = await Promise.all(result);
+      for (let i = 0; i < finishedResult.length; i++) {
+        const { data } = await axios.get(
+          `https://api.opencagedata.com/geocode/v1/json?q=${
+            finishedResult[i][2]
+          }&key=237eddf069a14bba99f0968b55c075b8`
+        );
+        finishedResult[i].coordinate = {
+          latitude: data.results[0].geometry.lat,
+          longitude: data.results[0].geometry.lng
+        };
+      }
 
-    res.status(200).json({
-      opportunities: finishedResult
-    });
-  } catch (e) {
-    res.sendStatus(400);
+      for (let i = 0; i < finishedResult.length; i++) {
+        for (let j = 0; j < finishedResult[i]["6"].length; j++) {
+          if (
+            finishedResult[i]["6"][j].toLowerCase() ==
+            user.address.toLowerCase()
+          ) {
+            finishedResult[i].volunteer = true;
+          }
+        }
+      }
+
+      res.status(200).json({
+        opportunities: finishedResult
+      });
+    } catch (e) {
+      res.sendStatus(400);
+    }
   }
-});
+);
 
 router.get("/organizerOpportunities", async (req, res) => {
   const privateKey = CryptoUtils.generatePrivateKey();
@@ -271,8 +301,23 @@ router.get(
           from: user.address
         });
 
+        const search = details[6].map(async volunteer => {
+          const metadata = await contract.methods.getVolunteer(volunteer).call({
+            from: user.address
+          });
+
+          return { ...metadata, volunteer };
+        });
+
+        const finishedSearch = await Promise.all(search);
+
         const owner = await User.findOne({ address: details[5].toLowerCase() });
-        return { ...details, address: opportunity, email: owner.email };
+        return {
+          ...details,
+          address: opportunity,
+          email: owner.email,
+          volunteers: finishedSearch
+        };
       });
 
       const finishedResult = await Promise.all(result);

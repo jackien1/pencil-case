@@ -3,6 +3,7 @@ pragma solidity ^0.5.0;
 contract Opportunity {
     string title;
     string description;
+    string date;
     string location;
     string QRcode;
 
@@ -16,11 +17,12 @@ contract Opportunity {
     mapping (address => bool) confirmed;
     mapping (address => string) endLocation;
 
-    constructor(string memory _title, string memory _description, string memory _location, string memory _QRcode, uint _quantity, address _owner) public {
+    constructor(string memory _title, string memory _description, string memory _location, string memory _QRcode, uint _quantity, address _owner, string memory _date) public {
         title = _title;
         description = _description;
         location = _location;
         QRcode = _QRcode;
+        date = _date;
         quantity = _quantity;
         owner = _owner;
     }
@@ -55,7 +57,7 @@ contract Opportunity {
         return (QR[_volunteer], time[_volunteer], confirmed[_volunteer], endLocation[_volunteer]);
     }
 
-    function getDetails() public view returns(string memory, string memory, string memory, string memory, uint, address, address[] memory) {
-        return (title, description, location, QRcode, quantity, owner, volunteers);
+    function getDetails() public view returns(string memory, string memory, string memory, string memory, uint, address, address[] memory, string memory) {
+        return (title, description, location, QRcode, quantity, owner, volunteers, date);
     }
 }
