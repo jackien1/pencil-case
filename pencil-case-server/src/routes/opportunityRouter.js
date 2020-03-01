@@ -156,59 +156,96 @@ router.get(
   }
 );
 
-router.get("/organizerOpportunities", async (req, res) => {
-  const privateKey = CryptoUtils.generatePrivateKey();
-  const publicKey = CryptoUtils.publicKeyFromPrivateKey(privateKey);
-  let address = LocalAddress.fromPublicKey(publicKey).toString();
+router.get(
+  "/organizerOpportunities",
+  passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    const user = await User.findOne({ email: req.user.email });
+    const privateKey = new Uint8Array(JSON.parse("[" + user.privateKey + "]"));
+    const publicKey = CryptoUtils.publicKeyFromPrivateKey(privateKey);
 
-  let client = new Client(
-    "extdev-plasma-us1",
-    "wss://extdev-plasma-us1.dappchains.com/websocket",
-    "wss://extdev-plasma-us1.dappchains.com/queryws"
-  );
+    let client = new Client(
+      "extdev-plasma-us1",
+      "wss://extdev-plasma-us1.dappchains.com/websocket",
+      "wss://extdev-plasma-us1.dappchains.com/queryws"
+    );
 
-  client.txMiddleware = [
-    new NonceTxMiddleware(publicKey, client),
-    new SignedTxMiddleware(privateKey)
-  ];
+    client.txMiddleware = [
+      new NonceTxMiddleware(publicKey, client),
+      new SignedTxMiddleware(privateKey)
+    ];
 
-  let web3 = new Web3(new LoomProvider(client, privateKey));
+    let web3 = new Web3(new LoomProvider(client, privateKey));
 
-  let hubInstance = new web3.eth.Contract(
-    Hub.abi,
-    Hub.networks["9545242630824"].address,
-    { from: address }
-  );
+    let hubInstance = new web3.eth.Contract(
+      Hub.abi,
+      Hub.networks["9545242630824"].address,
+      { from: user.address }
+    );
 
-  try {
-    let opportunities = await hubInstance.methods.returnOpportunities().call();
+    try {
+      let opportunities = await hubInstance.methods
+        .returnOpportunities()
+        .call();
 
-    const result = await opportunities.map(async opportunity => {
-      const contract = new web3.eth.Contract(Opportunity.abi, opportunity);
-      const details = await contract.methods.getDetails().call({
-        from: address
+      const result = await opportunities.map(async opportunity => {
+        const contract = new web3.eth.Contract(Opportunity.abi, opportunity);
+        const details = await contract.methods.getDetails().call({
+          from: user.address
+        });
+
+        const search = details[6].map(async volunteer => {
+          const metadata = await contract.methods.getVolunteer(volunteer).call({
+            from: user.address
+          });
+
+          return { ...metadata, volunteer };
+        });
+
+        const finishedSearch = await Promise.all(search);
+
+        const owner = await User.findOne({ address: details[5].toLowerCase() });
+
+        return {
+          ...details,
+          address: opportunity,
+          email: owner.email,
+          volunteers: finishedSearch
+        };
       });
 
-      const user = await User.findOne({ address: details[5].toLowerCase() });
-      return { ...details, address: opportunity, email: user.email };
-    });
+      const finishedResult = await Promise.all(result);
 
-    const finishedResult = await Promise.all(result);
-    const filteredResult = [];
-
-    for (let i = 0; i < finishedResult.length; i++) {
-      if (finishedResult[i][5] == address) {
-        filteredResult.push(finishedResult[i]);
+      let filteredResult = [];
+      for (let i = 0; i < finishedResult.length; i++) {
+        if (finishedResult[i][5].toLowerCase() == user.address.toLowerCase()) {
+          filteredResult.push(finishedResult[i]);
+        }
       }
-    }
 
-    res.status(200).json({
-      opportunities: finishedResult
-    });
-  } catch (e) {
-    res.sendStatus(400);
+      for (let i = 0; i < filteredResult.length; i++) {
+        let requests = [];
+
+        for (let j = 0; j < filteredResult[i].volunteers.length; j++) {
+          if (
+            filteredResult[i].volunteers[j]["0"] &&
+            filteredResult[i].volunteers[j]["1"] != "0"
+          ) {
+            requests.push(filteredResult[i].volunteers[j]);
+          }
+        }
+
+        filteredResult[i].requests = requests;
+      }
+
+      res.status(200).json({
+        opportunities: filteredResult
+      });
+    } catch (e) {
+      res.sendStatus(400);
+    }
   }
-});
+);
 
 router.post(
   "/organizerOpportunity",
@@ -549,6 +586,103 @@ router.post(
         success: true
       });
     } catch (e) {
+      res.sendStatus(400);
+    }
+  }
+);
+
+router.get(
+  "/myHours",
+  passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    const user = await User.findOne({ email: req.user.email });
+    const privateKey = new Uint8Array(JSON.parse("[" + user.privateKey + "]"));
+    const publicKey = CryptoUtils.publicKeyFromPrivateKey(privateKey);
+
+    let hours = 0;
+
+    let client = new Client(
+      "extdev-plasma-us1",
+      "wss://extdev-plasma-us1.dappchains.com/websocket",
+      "wss://extdev-plasma-us1.dappchains.com/queryws"
+    );
+
+    client.txMiddleware = [
+      new NonceTxMiddleware(publicKey, client),
+      new SignedTxMiddleware(privateKey)
+    ];
+
+    let web3 = new Web3(new LoomProvider(client, privateKey));
+
+    let hubInstance = new web3.eth.Contract(
+      Hub.abi,
+      Hub.networks["9545242630824"].address,
+      { from: user.address }
+    );
+
+    try {
+      let opportunities = await hubInstance.methods
+        .returnOpportunities()
+        .call();
+
+      const result = await opportunities.map(async opportunity => {
+        const contract = new web3.eth.Contract(Opportunity.abi, opportunity);
+        const details = await contract.methods.getDetails().call({
+          from: user.address
+        });
+
+        const search = details[6].map(async volunteer => {
+          const metadata = await contract.methods.getVolunteer(volunteer).call({
+            from: user.address
+          });
+
+          return { ...metadata, volunteer };
+        });
+
+        const finishedSearch = await Promise.all(search);
+
+        const owner = await User.findOne({ address: details[5].toLowerCase() });
+        return {
+          ...details,
+          address: opportunity,
+          email: owner.email,
+          volunteers: finishedSearch
+        };
+      });
+
+      const finishedResult = await Promise.all(result);
+      const filteredResult = [];
+
+      for (let i = 0; i < finishedResult.length; i++) {
+        for (let j = 0; j < finishedResult[i]["6"].length; j++) {
+          if (
+            finishedResult[i]["6"][j].toLowerCase() ==
+            user.address.toLowerCase()
+          ) {
+            filteredResult.push(finishedResult[i]);
+            break;
+          }
+        }
+      }
+
+      for (let i = 0; i < filteredResult.length; i++) {
+        for (let j = 0; j < filteredResult[i].volunteers.length; j++) {
+          if (
+            filteredResult[i].volunteers[j].volunteer.toLowerCase() ==
+              user.address.toLowerCase() &&
+            filteredResult[i].volunteers[j][2]
+          ) {
+            hours += Number(filteredResult[i].volunteers[j][1]);
+            break;
+          }
+        }
+      }
+
+      res.status(200).json({
+        hours
+      });
+    } catch (e) {
+      console.log(e);
       res.sendStatus(400);
     }
   }

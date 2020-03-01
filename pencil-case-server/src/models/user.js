@@ -11,8 +11,7 @@ const User = new mongoose.Schema({
     required: true
   },
   userName: {
-    type: String,
-    unique: true
+    type: String
   },
   address: {
     type: String,
@@ -35,12 +34,10 @@ const User = new mongoose.Schema({
     required: true
   },
   school: {
-    type: String,
-    required: true
+    type: String
   },
   location: {
-    type: String,
-    required: true
+    type: String
   },
   organizer: {
     type: Boolean,
