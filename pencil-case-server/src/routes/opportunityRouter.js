@@ -126,10 +126,11 @@ router.get(
 
       for (let i = 0; i < finishedResult.length; i++) {
         const { data } = await axios.get(
-          `https://api.opencagedata.com/geocode/v1/json?q=${
+          `https://api.opencagedata.com/geocode/v1/json?key=237eddf069a14bba99f0968b55c075b8&q=${
             finishedResult[i][2]
-          }&key=237eddf069a14bba99f0968b55c075b8`
+          }`
         );
+
         finishedResult[i].coordinate = {
           latitude: data.results[0].geometry.lat,
           longitude: data.results[0].geometry.lng
@@ -151,6 +152,7 @@ router.get(
         opportunities: finishedResult
       });
     } catch (e) {
+      console.log(e);
       res.sendStatus(400);
     }
   }
