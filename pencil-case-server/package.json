@@ -16,7 +16,7 @@
     "ethers": "^4.0.44",
     "express": "^4.17.1",
     "http": "^0.0.0",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "loom-js": "1.70.0",
     "loom-truffle-provider": "^0.13.0",
     "mongoose": "^5.9.1",
